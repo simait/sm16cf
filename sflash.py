@@ -1,13 +1,21 @@
 #!/usr/bin/env python
 
-import serial, m16c, sys
+import serial, m16c, struct, sys
 from optparse import OptionParser
 
 def read_status(device):
-	print('Status register: 0x%4x' % device.readStatus())
+	status = device.readStatus()
+	print('Status register (SRD): 0x%2x' % struct.unpack("B", status[0])[0])
+	print('Status register (SRD1): 0x%2x' % struct.unpack("B", status[1])[0])
 
 def read_version(device):
 	print('Firmware version: %s' % device.readVersion())
+
+def read_page(device):
+	device.readPage(0x99aabbcc)
+
+def id_check(device):
+	device.idCheck()
 
 if __name__ == "__main__":
 
@@ -40,6 +48,12 @@ if __name__ == "__main__":
 			'Example: ae:23:3a:dd:ea:32'
 			)
 	parser.add_option(
+			'-a', '--device-id-addr',
+			dest='device_id_addr',
+			type='int',
+			help='The address of the device id. Example: 0x23ff00'
+			)
+	parser.add_option(
 			'-n', '--no-validation',
 			dest='clock_validation',
 			action='store_false',
@@ -59,6 +73,20 @@ if __name__ == "__main__":
 			action='store_const',
 			const=read_version,
 			help='Read the firmware version of the device.'
+			)
+	parser.add_option(
+			'--read-page',
+			dest='action',
+			action='store_const',
+			const=read_page,
+			help='Read the specified page from the device.'
+			)
+	parser.add_option(
+			'-c', '--id-check',
+			dest='action',
+			action='store_const',
+			const=id_check,
+			help='Perform id check for mutable operations.'
 			)
 	(options, args) = parser.parse_args()
 
@@ -109,7 +137,7 @@ if __name__ == "__main__":
 				timeout=options.timeout
 				)
 
-		flasher = m16c.Flasher(device, device_id)
+		flasher = m16c.Flasher(device, device_id, options.device_id_addr)
 		if options.clock_validation:
 			flasher.validateClock()
 		options.action(flasher)
