@@ -96,7 +96,7 @@ class M16CFlash:
 
 		(options, args) = parser.parse_args()
 		
-		# Garbage is error?
+		# Garbage is error(?)
 		if len(args) != 0:
 			raise Exception(
 					'Unknown garbage on command line:' +
@@ -114,6 +114,7 @@ class M16CFlash:
 		self.__device_id = options.device_id
 		if self.__device_id != None:
 			try:
+				# Create a list of int instead
 				self.__device_id = self.__device_id.strip().split(':')
 				fields = len(self.__device_id)
 				if fields != 6:
@@ -121,11 +122,11 @@ class M16CFlash:
 							'Invalid number of fields in device id.'
 							)
 
-				device_id = filter(
+				# Make sure no number are too large or too small
+				self.__device_id = filter(
 						lambda x: (x >= 0) and (x <= 255),
 						map(lambda x: int(x, 16), self.__device_id)
 						)
-
 				if fields != len(self.__device_id):
 					raise Exception('Device id field(s) out of range.')
 
@@ -168,9 +169,9 @@ class M16CFlash:
 			raise Exception('Device id not specified.')
 
 		if self.__device_id_addr == None:
-			raise Exception('Device id address not specified.')
-
-		self.__flasher.id_validate()
+			self.__flasher.id_validate(self.__device_id)
+		else:
+			self.__flasher.id_validate(self.__device_id, self.__device_id_addr)
 
 	def run(self):
 
@@ -178,8 +179,8 @@ class M16CFlash:
 
 if __name__ == "__main__":
 
-	try:
-		flash = M16CFlash()
-		flash.run()
-	except Exception, (error):
-		sys.exit(error)
+	#try:
+	flash = M16CFlash()
+	flash.run()
+	#except Exception, (error):
+	#	sys.exit(error)

@@ -56,7 +56,7 @@ class Flasher:
 
 		self.__sanity(id_validation=False, clock_validation=True)
 
-		status = read_status()
+		status = self.status_read()
 		if ((status >> 10) & 0x3) == 0x3:
 			raise FlasherException('Trying to validate when already validated.')
 
@@ -66,18 +66,17 @@ class Flasher:
 		cmd_id_check = struct.pack(
 				"BBBBB",
 				0xf5,
-				self.__device_id_addr & 0xff,
-				(self.__device_id_addr >> 8) & 0xff,
-				(self.__device_id_addr >> 16) & 0xff,
-				len(self.__device_id)
+				device_id_addr & 0xff,
+				(device_id_addr >> 8) & 0xff,
+				(device_id_addr >> 16) & 0xff,
+				len(device_id)
 				)
-		for i in range(len(device_id)):
-			cmd_id_check += struct.pack("B", self.__device_id[i])
+		cmd_id_check += struct.pack('B'*len(device_id), *device_id)
 
 		self.__device.write(cmd_id_check)
 		
 		status = self.status_read()
-		print(struct.unpack("BB", status))
+		print('0x%04x (%s)' % (status, str(self.id_validated())))
 
 	def id_validated(self):
 		
