@@ -6,77 +6,141 @@ import struct
 
 class FlasherException(Exception):
 	"""Base class for Flasher exceptions."""
-class Flasher:
-	def __init__(self, device, device_id=None, device_id_addr=None):
-		self.device = device
-		self.device_id = device_id
-		self.device_id_addr = device_id_addr
 
-	def validateClock(self):
+class Flasher:
+	def __init__(self, device, clock_validated=False):
+		self.__device = device
+		self.__clock_validated = clock_validated
+
+
+	def __sanity(self, id_validation=True, clock_validation=True):
+		"""For internal use ONLY!"""
+
+		if clock_validation:
+			if not self.__clock_validated:
+				raise FlasherException('Clock validation required.')
+		if id_validation:
+			if not self.id_validated():
+				raise FlasherException('Device id validation required.')
+
+	def clock_validate(self):
+
+		# Note, __sanity does not work here...
+		if self.__clock_validated:
+			raise FlasherException('Clock already validated.')
+
 		zero = struct.pack("B", 0x00)
 		cmd_clock = struct.pack("B", 0xb0)
-		self.device.write(cmd_clock)
-		if self.device.read() != cmd_clock:
+		self.__device.write(cmd_clock)
+		if self.__device.read() != cmd_clock:
 			raise FlasherException(
 					'Could not connect: Clock valiadation failed.'
 					)
 
 		for i in range(16):
-			self.device.write(zero)
+			self.__device.write(zero)
 			time.sleep(0.02)
 
-		if self.device.read() != cmd_clock:
+		if self.__device.read() != cmd_clock:
 			raise FlasherException(
 					'Could not connect: Clock valiadation failed.'
 					)
 
-	def idCheck(self):
-		if self.device_id == None:
-			raise FlasherException(
-					'Unable to check id, none specified.'
-					)
-		if self.device_id_addr == None:
-			raise FlasherException(
-					'No device id address specified.'
-					)
+		self.__clock_validated = True
+
+	def clock_validated(self):
+
+		return self.__clock_validated
+
+	def id_validate(self, device_id, device_id_addr=0xffff):
+
+		self.__sanity(id_validation=False, clock_validation=True)
+
+		status = read_status()
+		if ((status >> 10) & 0x3) == 0x3:
+			raise FlasherException('Trying to validate when already validated.')
+
+		elif len(device_id) > 7:
+			raise FlasherException('Device id too long (%d).' % len(device_id))
+
 		cmd_id_check = struct.pack(
 				"BBBBB",
 				0xf5,
-				self.device_id_addr & 0xff,
-				(self.device_id_addr >> 8) & 0xff,
-				(self.device_id_addr >> 16) & 0xff,
-				len(self.device_id)
+				self.__device_id_addr & 0xff,
+				(self.__device_id_addr >> 8) & 0xff,
+				(self.__device_id_addr >> 16) & 0xff,
+				len(self.__device_id)
 				)
-		for i in range(len(self.device_id)):
-			cmd_id_check += struct.pack("B", self.device_id[i])
+		for i in range(len(device_id)):
+			cmd_id_check += struct.pack("B", self.__device_id[i])
 
-		self.device.write(cmd_id_check)
-		return
+		self.__device.write(cmd_id_check)
 		
-	def readStatus(self):
-		cmd_read_status = struct.pack("B", 0x70)
-		self.device.write(cmd_read_status)
-		status = self.device.read(2)
-		return status
+		status = self.status_read()
+		print(struct.unpack("BB", status))
 
-	def readVersion(self):
-		cmd_version = struct.pack("B", 0xfb)
-		self.device.write(cmd_version)
-		version = self.device.read(8)
+	def id_validated(self):
+		
+		return (self.status_read() & 0xc00) == 0xc00
+
+	def status_read(self):
+
+		self.__sanity(id_validation=False, clock_validation=True)
+
+		cmd_status_read = struct.pack("B", 0x70)
+		self.__device.write(cmd_status_read)
+		status = self.__device.read(2)
+		return struct.unpack("<H", status)[0]
+
+	def version_read(self):
+
+		self.__sanity(id_validation=False, clock_validation=True)
+
+		cmd_version_read = struct.pack("B", 0xfb)
+		self.__device.write(cmd_version_read)
+		version = self.__device.read(8)
 		return version
 
-	def readPage(self, addr):
-		cmd_read_page = struct.pack(
+	def page_read(self, addr):
+
+		self.__sanity(id_validation=True, clock_validation=True)
+
+		cmd_page_read = struct.pack(
 				"BBB",
 				0xff,
 				(addr >> 8) & 0xff,
 				(addr >> 16) & 0xff
 				)
-		self.device.write(cmd_read_page)
-		page = self.device.read(256)
+		self.__device.write(cmd_page_read)
+		page = self.__device.read(256)
 		if len(page) != 256:
 			raise FlasherException(
 					'Unable to read page: Timeout or insufficient data (%d).' % len(page)
 					)
-		for i in range(len(page)):
-			print(hex(int(page[i])))
+		return page
+
+	def page_write(self, addr, data):
+
+		self.__sanity(id_validation=True, clock_validation=True)
+
+		cmd_page_write = struct.pack(
+				"BBB",
+				0x41,
+				(addr >> 8) & 0xff,
+				(addr >> 16) & 0xff
+				)
+		self.__device.write(cmd_page_write)
+		self.__device.write(data)
+
+	def page_erase(self, addr):
+
+		self.__sanity(id_validation=True, clock_validation=True)
+
+		cmd_page_erase = struct.pack(
+				"BBBB",
+				0x20,
+				(addr >> 8) & 0xff,
+				(addr >> 16) & 0xff,
+				0xd0
+				)
+		self.__device.write(cmd_page_erase)
