@@ -11,6 +11,10 @@ class Flasher:
 	def __init__(self, device, clock_validated=False):
 		self.__device = device
 		self.__clock_validated = clock_validated
+		self.__STATUS_WRITE_FAILED = 0
+		self.__STATUS_PAGE_LOCKED = 1
+		self.__STATUS_INVALID_BLOCK = 2
+		self.__STATUS_INVALID_CMD = 3
 
 
 	def __sanity(self, id_validation=True, clock_validation=True):
@@ -23,6 +27,49 @@ class Flasher:
 			if not self.id_validated():
 				raise FlasherException('Device id validation required.')
 
+
+	def __status_ready(self, status):
+
+		return (status & 0x80) == 0x80
+
+	def __status_flash_ok(self, status):
+
+		return (status & 0x78) == 0
+
+	def __status_check_ok(self, status):
+
+		return (status & 0x1000) == 0x1000
+
+	def __status_id_ok(self, status):
+
+		return (status & 0xc00) == 0xc00
+
+	def __status_ready_wait(self):
+
+		while True:
+			status = self.status_read()
+			if not self.__status_ready(status):
+				time.sleep(0.1) # Sleep for 100ms
+			else:
+				break
+
+	def __status_flash_check(self, status):
+
+		if (status & 0x38) == 0:
+			return self.__STATUS_OK
+
+		if (status & 0x18) == 0x18:
+			return self.__STATUS_INVALID_CMD
+
+		if (status & 0x10) == 0x10:
+			return self.__STATUS_FLASH_INVALID_BLOCK
+
+		if (status & 0x08) == 0x08:
+			return self.__STATUS_FLASH_PAGE_LOCKED
+
+		if (status & 0x04) == 0x04:
+			return self.__STATUS_FLASH_WRITE_FAILED
+	
 	def clock_validate(self):
 
 		# Note, __sanity does not work here...
@@ -52,7 +99,29 @@ class Flasher:
 
 		return self.__clock_validated
 
-	def id_validate(self, device_id, device_id_addr=0xffff):
+	def baud_set(self, baud):
+		
+		self.__sanity(id_validation=False, clock_validation=True)
+
+		if self.__device.getBaudrate() == baud:
+			return
+
+		try:
+			baud_rates = [9600, 19200, 38400, 57600]
+			cmd_baud_set = struct.pack("B", 0xb0+baud_rates.index(baud))
+		except:
+			raise FlasherException('Invalid baudrate specified.')
+
+		self.__device.write(cmd_baud_set)
+		if self.__device.read() != cmd_baud_set:
+			raise FlasherException('Set baudrate failed.')
+		self.__device.setBaudrate(baud)
+
+	def baud_get(self, baud):
+		
+		return self.__device.getBaudrate()
+
+	def id_validate(self, device_id, device_id_addr=0x0fffdf):
 
 		self.__sanity(id_validation=False, clock_validation=True)
 
@@ -64,19 +133,18 @@ class Flasher:
 			raise FlasherException('Device id too long (%d).' % len(device_id))
 
 		cmd_id_check = struct.pack(
-				"BBBBB",
+				"BBBBB"+"B"*len(device_id),
 				0xf5,
 				device_id_addr & 0xff,
 				(device_id_addr >> 8) & 0xff,
 				(device_id_addr >> 16) & 0xff,
-				len(device_id)
+				len(device_id),
+				*device_id
 				)
-		cmd_id_check += struct.pack('B'*len(device_id), *device_id)
-
 		self.__device.write(cmd_id_check)
-		
-		status = self.status_read()
-		print('0x%04x (%s)' % (status, str(self.id_validated())))
+
+		if not self.id_validated():
+			raise FlasherException('Failed to validate id.')
 
 	def id_validated(self):
 		
@@ -91,6 +159,15 @@ class Flasher:
 		status = self.__device.read(2)
 		return struct.unpack("<H", status)[0]
 
+	def status_clear(self):
+
+		self.__sanity(id_validation=True, clock_validation=True)
+
+		cmd_status_read = struct.pack("B", 0x50)
+		self.__device.write(cmd_status_read)
+
+		# TODO: Check result of command
+
 	def version_read(self):
 
 		self.__sanity(id_validation=False, clock_validation=True)
@@ -99,6 +176,62 @@ class Flasher:
 		self.__device.write(cmd_version_read)
 		version = self.__device.read(8)
 		return version
+
+	def lock_enable(self):
+
+		self.__sanity(id_validation=True, clock_validation=True)
+
+		cmd_lock_enable = struct.pack("B", 0x7a)
+		self.__device.write(cmd_lock_enable)
+
+		# TODO: Check result of command
+
+	def lock_disable(self):
+
+		self.__sanity(id_validation=True, clock_validation=True)
+
+		cmd_lock_disable = struct.pack("B", 0x75)
+		self.__device.write(cmd_lock_disable)
+
+		# TODO: Check result of command
+
+	def program_run(self, data):
+
+		self.__sanity(id_validation=True, clock_validation=True)
+
+		if len(data) > 0xffff:
+			raise FlasherException('Program too large (>0xffff).')
+
+		checksum = 0
+		cmd_program_run = struct.pack(
+				"BBBB",
+				0xfa,
+				len(data) & 0xff,
+				(len(data) >> 8) & 0xff,
+				checksum
+				)
+		self.__device.write(cmd_program_run)
+		self.__device.write(data)
+
+		# TODO: Check result of command
+
+	def boot_read(self, addr):
+
+		self.__sanity(id_validation=True, clock_validation=True)
+		
+		cmd_boot_read = struct.pack(
+				"BBB",
+				0xfc,
+				(addr >> 8) & 0xff,
+				(addr >> 16) & 0xff
+				)
+		self.__device.write(cmd_page_read)
+		page = self.__device.read(256)
+		if len(page) != 256:
+			raise FlasherException(
+					'Unable to read boot page: Timeout or insufficient data (%d).' % len(page)
+					)
+		return page
 
 	def page_read(self, addr):
 
@@ -122,6 +255,9 @@ class Flasher:
 
 		self.__sanity(id_validation=True, clock_validation=True)
 
+		if len(data) > 256:
+			raise FlasherException('Invalid page size (%d != 256).' % len(data))
+
 		cmd_page_write = struct.pack(
 				"BBB",
 				0x41,
@@ -130,6 +266,8 @@ class Flasher:
 				)
 		self.__device.write(cmd_page_write)
 		self.__device.write(data)
+
+		# TODO: Check result of command
 
 	def page_erase(self, addr):
 
@@ -143,3 +281,5 @@ class Flasher:
 				0xd0
 				)
 		self.__device.write(cmd_page_erase)
+
+		# TODO: Check result of command

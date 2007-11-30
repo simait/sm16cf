@@ -1,0 +1,4 @@
+* Implement CRC-CCITT, needed for the read_check functionality of the firmware.
+* Implement the binary file module.
+* Implement the flashing for a file module, got rough structure for how this
+  should be done...

@@ -42,7 +42,8 @@ class M16CFlash:
 				'-a', '--device-id-addr',
 				dest='device_id_addr',
 				type='int',
-				help='The address of the device id. Example: 0x23ff00'
+				default=0x0fffdf,
+				help='The address of the device id. Example: 0x0fffdf'
 				)
 		parser.add_option(
 				'-n', '--no-clock-validation',
@@ -117,10 +118,6 @@ class M16CFlash:
 				# Create a list of int instead
 				self.__device_id = self.__device_id.strip().split(':')
 				fields = len(self.__device_id)
-				if fields != 6:
-					raise Exception(
-							'Invalid number of fields in device id.'
-							)
 
 				# Make sure no number are too large or too small
 				self.__device_id = filter(
@@ -133,13 +130,11 @@ class M16CFlash:
 			except TypeError:
 				raise Exception('Device id contains invalid field(s).')
 
-		# Device id addr, TODO: find the default address?
 		self.__device_id_addr = options.device_id_addr
 
 		# Create a serial device
 		device = serial.Serial(
 				port=options.device,
-				baudrate=options.baud,
 				timeout=options.timeout
 				)
 
@@ -150,6 +145,9 @@ class M16CFlash:
 				)
 		if not self.__flasher.clock_validated():
 			self.__flasher.clock_validate()
+			self.__flasher.baud_set(options.baud)
+		else:
+			device.setBaudrate(options.baud)
 
 		# Last but not least grab what we are supposed to do.
 		self.__action = options.action
@@ -168,10 +166,7 @@ class M16CFlash:
 		if self.__device_id == None:
 			raise Exception('Device id not specified.')
 
-		if self.__device_id_addr == None:
-			self.__flasher.id_validate(self.__device_id)
-		else:
-			self.__flasher.id_validate(self.__device_id, self.__device_id_addr)
+		self.__flasher.id_validate(self.__device_id, self.__device_id_addr)
 
 	def run(self):
 
