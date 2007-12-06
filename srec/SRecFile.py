@@ -18,17 +18,6 @@ class SRecFile:
 		self.__merge()
 		self.__convert()
 
-		prev = None
-		total = 0
-		#for i in self.__segments:
-		#	if prev:
-		#		sys.stdout.write(' (0x%06x)\n' % (i[0]-prev))
-		#	sys.stdout.write('0x%06x-0x%06x (%d)' % (i[0], i[0]+len(i[1]),len(i[1])))
-		#	prev = i[0]+len(i[1])
-		#	total += len(i[1])
-		#sys.stdout.write('\n')
-		#print('Total size: 0x%06x(%d)' % (total, total))
-
 	def __make_segment(self, addr_len, line):
 		"""For internal use ONLY!"""
 

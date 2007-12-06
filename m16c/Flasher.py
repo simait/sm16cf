@@ -29,22 +29,27 @@ class Flasher:
 
 
 	def __status_ready(self, status):
+		"""For internal use ONLY!"""
 
 		return (status & 0x80) == 0x80
 
 	def __status_flash_ok(self, status):
+		"""For internal use ONLY!"""
 
-		return (status & 0x78) == 0
+		return (status & 0x38) == 0
 
 	def __status_check_ok(self, status):
+		"""For internal use ONLY!"""
 
 		return (status & 0x2000) == 0x2000
 
 	def __status_id_ok(self, status):
+		"""For internal use ONLY!"""
 
 		return (status & 0xc00) == 0xc00
 
 	def __status_ready_wait(self):
+		"""For internal use ONLY!"""
 
 		while True:
 			status = self.status_read()
@@ -54,6 +59,7 @@ class Flasher:
 				break
 
 	def __status_flash_check(self, status):
+		"""For internal use ONLY!"""
 
 		if (status & 0x38) == 0:
 			return self.__STATUS_OK
