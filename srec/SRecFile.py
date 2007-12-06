@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import struct
+import sys, struct
 
 """Motorola S-Record parser."""
 
@@ -18,12 +18,23 @@ class SRecFile:
 		self.__merge()
 		self.__convert()
 
-	def __make_segment(self, line):
+		prev = None
+		total = 0
+		#for i in self.__segments:
+		#	if prev:
+		#		sys.stdout.write(' (0x%06x)\n' % (i[0]-prev))
+		#	sys.stdout.write('0x%06x-0x%06x (%d)' % (i[0], i[0]+len(i[1]),len(i[1])))
+		#	prev = i[0]+len(i[1])
+		#	total += len(i[1])
+		#sys.stdout.write('\n')
+		#print('Total size: 0x%06x(%d)' % (total, total))
+
+	def __make_segment(self, addr_len, line):
 		"""For internal use ONLY!"""
 
 
 		# Make sure we have at least the smallest possible entry(I think?)
-		if len(line) < 10:
+		if len(line) < (6 + 2*addr_len):
 			raise SRecException('S-Record too short (%d).' % len(line))
 		
 		# Validate the size entry
@@ -35,17 +46,23 @@ class SRecFile:
 		if len(line) != (2*size+2):
 			raise SRecException('Invalid length in S-Record.')
 
-		# Address
+		# Address, depends on type
+		if not addr_len in (2,3):
+			raise SRecException('Invalid address length of S-Record.')
+
+		addr_start = 2
+		addr_end = addr_start + 2*addr_len
+
 		try:
-			addr = int(line[2:6], 16)
+			addr = int(line[addr_start:addr_end], 16)
 		except:
 			raise SRecException('Invalid address entry in S-Record.')
 
 		# Data
 		data = list()
 		try:
-			for i in range(0,2*(size-3),2):
-				data.append(int(line[6+i:8+i], 16))
+			for i in range(0,2*(size-addr_len-1),2):
+				data.append(int(line[addr_end+i:addr_end+i+2], 16))
 		except:
 			raise SRecException('Invalid data entry in S-Record.')
 
@@ -55,7 +72,12 @@ class SRecFile:
 		except:
 			raise SRecException('Invalid checksum entry in S-Record.')
 
-		csum_calc = size + (addr & 0xff) + ((addr >> 8) & 0xff)
+		tmp = addr
+		csum_calc = size
+		while tmp > 0:
+				csum_calc += tmp & 0xff
+				tmp >>= 8
+
 		for i in data:
 			csum_calc += (i & 0xff)
 		csum_calc = (~csum_calc & 0xff)
@@ -81,7 +103,8 @@ class SRecFile:
 		while True:
 			line = self.__file.readline()
 			if len(line) == 0:
-				raise SRecException('Unexpected end of file.')
+				break
+				#raise SRecException('Unexpected end of file.')
 
 			# Determine the line ending of the file
 			if self.__line_ending == None:
@@ -115,19 +138,18 @@ class SRecFile:
 							)
 
 			# Regular data record.
-			elif line[1] == '1':
+			elif line[1] in ('1', '2'):
 				# Strip line ending and the 'S' and section type then pass
 				# To the make segment function for further processing.
-				self.__make_segment(line[2:-len(self.__line_ending)])
+				try:
+					addr_len = int(line[1])+1
+				except:
+					raise SRecException('BUG!!!')
 
-			# Last record in the file.
-			elif line[1] == '9':
-				if len(self.__file.readline()) != 0:
-					raise SRecException('Garbage at the end of the file.')
-				break
+				self.__make_segment(addr_len, line[2:-len(self.__line_ending)])
 
-			# No other record types(are others but they are not parsed).
-			else:
+			# Only record types we accept right now.
+			elif not line[1] in ('8', '9'):
 				raise SRecException('Invalid record type: \'%s\'.' % line[:2])
 
 			line_number += 1

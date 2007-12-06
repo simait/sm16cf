@@ -38,7 +38,7 @@ class Flasher:
 
 	def __status_check_ok(self, status):
 
-		return (status & 0x1000) == 0x1000
+		return (status & 0x2000) == 0x2000
 
 	def __status_id_ok(self, status):
 
@@ -125,8 +125,7 @@ class Flasher:
 
 		self.__sanity(id_validation=False, clock_validation=True)
 
-		status = self.status_read()
-		if ((status >> 10) & 0x3) == 0x3:
+		if self.id_validated():
 			raise FlasherException('Trying to validate when already validated.')
 
 		elif len(device_id) > 7:
@@ -231,11 +230,19 @@ class Flasher:
 			raise FlasherException(
 					'Unable to read boot page: Timeout or insufficient data (%d).' % len(page)
 					)
+
+		if not self.__status_flash_ok(self.status_read()):
+			raise FlasherException(
+					'Failed to read page at address: 0x%60x' % address & 0xffff00
+					)
+
 		return page
 
 	def page_read(self, addr):
 
 		self.__sanity(id_validation=True, clock_validation=True)
+
+		self.__status_ready_wait()
 
 		cmd_page_read = struct.pack(
 				"BBB",
@@ -249,11 +256,19 @@ class Flasher:
 			raise FlasherException(
 					'Unable to read page: Timeout or insufficient data (%d).' % len(page)
 					)
+
+		if not self.__status_flash_ok(self.status_read()):
+			raise FlasherException(
+					'Page write failed! (%d)' % self.__status_flash_check()
+					)
+
 		return page
 
 	def page_write(self, addr, data):
 
 		self.__sanity(id_validation=True, clock_validation=True)
+
+		self.__status_ready_wait()
 
 		if len(data) > 256:
 			raise FlasherException('Invalid page size (%d != 256).' % len(data))
@@ -267,11 +282,16 @@ class Flasher:
 		self.__device.write(cmd_page_write)
 		self.__device.write(data)
 
-		# TODO: Check result of command
+		if not self.__status_flash_ok(self.status_read()):
+			raise FlasherException(
+					'Page write failed! (%d)' % self.__status_flash_check()
+					)
 
 	def page_erase(self, addr):
 
 		self.__sanity(id_validation=True, clock_validation=True)
+
+		self.__status_ready_wait()
 
 		cmd_page_erase = struct.pack(
 				"BBBB",
@@ -282,4 +302,50 @@ class Flasher:
 				)
 		self.__device.write(cmd_page_erase)
 
-		# TODO: Check result of command
+		if not self.__status_flash_ok(self.status_read()):
+			raise FlasherException(
+					'Page erase failed! (%d)' % self.__status_flash_check()
+					)
+
+	def segment_write(self, segment):
+		"""Write a segment (address+data) to the device."""
+
+		# Check the address sanity.
+		if segment[0] < 0 or segment[0] > 0xffffffff:
+			raise FlasherException('Invalid segment address.')
+
+		# Make sure the segment does not go beyond the theorethical limit
+		if (segment[0] + len(segment[1])) > 0xffffff:
+			raise FlasherException(
+					'Segment size beyond end fo theorethical flash.'
+					)
+
+		page = segment[0] & 0xffff00
+		last = (segment[0] + len(segment[1]) + 0xff) & 0xffff00
+		sent = 0
+		lower = segment[0]
+		upper = segment[0] + len(segment[1])
+
+		while page < last:
+
+			start = max(0, lower-page)
+			end   = min(256, start+upper-lower)
+			size  = end - start
+
+			if (start, end) != (0, 256):
+				tmp = self.page_read(page)
+				data = tmp[:start] + segment[1][sent:sent+size] + tmp[end:]
+			else:
+				data = segment[1][sent:sent+size]
+			
+			if len(data) != 256:
+				raise FlasherException('Invalid length: %d (BUG!)' % len(data))
+
+			self.page_write(page, data)
+				
+			page += 0x100
+			sent += size
+			lower += size
+
+		if sent != len(segment[1]):
+			raise FlasherException('Failed to write all data? (BUG!)')
