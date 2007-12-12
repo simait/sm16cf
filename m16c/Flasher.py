@@ -68,13 +68,13 @@ class Flasher:
 			return self.__STATUS_INVALID_CMD
 
 		if (status & 0x10) == 0x10:
-			return self.__STATUS_FLASH_INVALID_BLOCK
+			return self.__STATUS_INVALID_BLOCK
 
 		if (status & 0x08) == 0x08:
-			return self.__STATUS_FLASH_PAGE_LOCKED
+			return self.__STATUS_PAGE_LOCKED
 
 		if (status & 0x04) == 0x04:
-			return self.__STATUS_FLASH_WRITE_FAILED
+			return self.__STATUS_WRITE_FAILED
 	
 	def clock_validate(self):
 
@@ -131,10 +131,10 @@ class Flasher:
 
 		self.__sanity(id_validation=False, clock_validation=True)
 
-		if self.id_validated():
-			raise FlasherException('Trying to validate when already validated.')
+		#if self.id_validated():
+		#	raise FlasherException('Trying to validate when already validated.')
 
-		elif len(device_id) > 7:
+		if len(device_id) > 7:
 			raise FlasherException('Device id too long (%d).' % len(device_id))
 
 		cmd_id_check = struct.pack(
@@ -204,19 +204,21 @@ class Flasher:
 
 		self.__sanity(id_validation=True, clock_validation=True)
 
-		if len(data) > 0xffff:
-			raise FlasherException('Program too large (>0xffff).')
+		raise FlasherException('Loading program to RAM not yet supported.')
 
-		checksum = 0
-		cmd_program_run = struct.pack(
-				"BBBB",
-				0xfa,
-				len(data) & 0xff,
-				(len(data) >> 8) & 0xff,
-				checksum
-				)
-		self.__device.write(cmd_program_run)
-		self.__device.write(data)
+		#if len(data) > 0xffff:
+		#	raise FlasherException('Program too large (>0xffff).')
+
+		#checksum = 0
+		#cmd_program_run = struct.pack(
+		#		"BBBB",
+		#		0xfa,
+		#		len(data) & 0xff,
+		#		(len(data) >> 8) & 0xff,
+		#		checksum
+		#		)
+		#self.__device.write(cmd_program_run)
+		#self.__device.write(data)
 
 		# TODO: Check result of command
 
@@ -263,9 +265,10 @@ class Flasher:
 					'Unable to read page: Timeout or insufficient data (%d).' % len(page)
 					)
 
-		if not self.__status_flash_ok(self.status_read()):
+		status = self.status_read()
+		if not self.__status_flash_ok(status):
 			raise FlasherException(
-					'Page write failed! (%d)' % self.__status_flash_check()
+					'Reading page 0x%06x failed (%d).' % (addr & 0xffff00, self.__status_flash_check(status))
 					)
 
 		return page
@@ -288,29 +291,50 @@ class Flasher:
 		self.__device.write(cmd_page_write)
 		self.__device.write(data)
 
-		if not self.__status_flash_ok(self.status_read()):
+		status = self.status_read()
+		if not self.__status_flash_ok(status):
 			raise FlasherException(
-					'Page write failed! (%d)' % self.__status_flash_check()
+					'Write to page 0x%06x failed (%d).' % (addr & 0xffff00, self.__status_flash_check(status))
 					)
 
-	def page_erase(self, addr):
+	def block_erase(self, addr):
 
 		self.__sanity(id_validation=True, clock_validation=True)
 
 		self.__status_ready_wait()
 
-		cmd_page_erase = struct.pack(
+		cmd_block_erase = struct.pack(
 				"BBBB",
 				0x20,
 				(addr >> 8) & 0xff,
 				(addr >> 16) & 0xff,
 				0xd0
 				)
-		self.__device.write(cmd_page_erase)
+		self.__device.write(cmd_block_erase)
 
+		status = self.status_read()
 		if not self.__status_flash_ok(self.status_read()):
 			raise FlasherException(
-					'Page erase failed! (%d)' % self.__status_flash_check()
+					'Block erase failed (%d).' % self.__status_flash_check(status)
+					)
+
+	def block_erase_all(self):
+
+		self.__sanity(id_validation=True, clock_validation=True)
+
+		self.__status_ready_wait()
+
+		cmd_block_erase = struct.pack(
+				"BB",
+				0xa7,
+				0xd0
+				)
+		self.__device.write(cmd_block_erase)
+
+		status = self.status_read()
+		if not self.__status_flash_ok(self.status_read()):
+			raise FlasherException(
+					'Erase all blocks failed(%d).' % self.__status_flash_check(status)
 					)
 
 	def segment_write(self, segment):
@@ -348,7 +372,7 @@ class Flasher:
 				raise FlasherException('Invalid length: %d (BUG!)' % len(data))
 
 			self.page_write(page, data)
-				
+
 			page += 0x100
 			sent += size
 			lower += size

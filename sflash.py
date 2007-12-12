@@ -109,6 +109,20 @@ class M16CFlash:
 				help='Write the input file to the device flash.'
 				)
 		parser.add_option(
+				'--flash-erase',
+				dest='action',
+				action='append_const',
+				const=self.__flash_erase,
+				help='Erase the block at address(es), range ignored.'
+				)
+		parser.add_option(
+				'--flash-erase-all',
+				dest='action',
+				action='append_const',
+				const=self.__flash_erase_all,
+				help='Erase all unlocked blocks.'
+				)
+		parser.add_option(
 				'--id-validate',
 				dest='action',
 				action='append_const',
@@ -249,6 +263,9 @@ class M16CFlash:
 				addr += upper-lower
 				rng  -= upper-lower
 
+				sys.stderr.write('\rReading 0x%06x...' % (addr & 0xffff00))
+		sys.stderr.write(' Done.\n')
+
 		# Dump to file or stdout
 		if self.__output_file != None:
 			file = open(self.__output_file, 'wb')
@@ -270,12 +287,48 @@ class M16CFlash:
 		for i in file.segments():
 			self.__flasher.segment_write(i)
 
+	
+	def __flash_erase(self):
+		if self.__address == None:
+			raise Exception('No address specified.')
+		
+		# Simple sanity check, might still fawk up but...
+		for i in self.__address:
+			if i[0] > 0xffff00:
+				raise Exception('Address out of range (beyond theorethical).')
+
+			# Erase the block.
+			self.__flasher.block_erase(i[0])
+
+	def __flash_erase_all(self):
+		
+		# Erase all unlocked blocks.
+		self.__flasher.block_erase_all()
+
+	def __ram_program(self):
+		if self.__input_file == None:
+			raise Exception('No input file was given.')
+
 	def run(self):
 
 		for i in self.__action:
 			i()
 
+def parse():
+	srec.SRecFile(open(sys.argv[1]))
+
 if __name__ == "__main__":
+
+	#import hotshot
+	#prof = hotshot.Profile('hotshot_stats')
+	#prof.runcall(parse)
+	#prof.close()
+
+	#from hotshot import stats
+	#s = stats.load('hotshot_stats')
+	#s.sort_stats('time').print_stats()
+
+	#sys.exit()
 
 	#try:
 	flash = M16CFlash()

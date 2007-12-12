@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, struct
+import sys, struct, timeit, array
 
 """Motorola S-Record parser."""
 
@@ -21,18 +21,19 @@ class SRecFile:
 	def __make_segment(self, addr_len, line):
 		"""For internal use ONLY!"""
 
-
+		lint = int
+		llen = len
 		# Make sure we have at least the smallest possible entry(I think?)
-		if len(line) < (6 + 2*addr_len):
-			raise SRecException('S-Record too short (%d).' % len(line))
+		if llen(line) < (6 + 2*addr_len):
+			raise SRecException('S-Record too short (%d).' % llen(line))
 		
 		# Validate the size entry
 		try:
-			size = int(line[:2], 16)
+			size = lint(line[:2], 16)
 		except:
 			raise SRecException('Invalid length entry in S-Record.')
 
-		if len(line) != (2*size+2):
+		if llen(line) != (2*size+2):
 			raise SRecException('Invalid length in S-Record.')
 
 		# Address, depends on type
@@ -43,7 +44,7 @@ class SRecFile:
 		addr_end = addr_start + 2*addr_len
 
 		try:
-			addr = int(line[addr_start:addr_end], 16)
+			addr = lint(line[addr_start:addr_end], 16)
 		except:
 			raise SRecException('Invalid address entry in S-Record.')
 
@@ -51,24 +52,23 @@ class SRecFile:
 		data = list()
 		try:
 			for i in range(0,2*(size-addr_len-1),2):
-				data.append(int(line[addr_end+i:addr_end+i+2], 16))
+				data.append(lint(line[addr_end+i:addr_end+i+2], 16))
 		except:
 			raise SRecException('Invalid data entry in S-Record.')
 
 		# Checksum
 		try:
-			csum = int(line[-2:], 16)
+			csum = lint(line[-2:], 16)
 		except:
 			raise SRecException('Invalid checksum entry in S-Record.')
 
 		tmp = addr
 		csum_calc = size
+		csum_calc += sum(data)
+		#csum_calc += sum(struct.unpack("BBBB", struct.pack("I", tmp)))
 		while tmp > 0:
 				csum_calc += tmp & 0xff
 				tmp >>= 8
-
-		for i in data:
-			csum_calc += (i & 0xff)
 		csum_calc = (~csum_calc & 0xff)
 
 		# Debug info...
@@ -89,11 +89,7 @@ class SRecFile:
 		"""For internal use ONLY!"""
 
 		line_number = 0
-		while True:
-			line = self.__file.readline()
-			if len(line) == 0:
-				break
-				#raise SRecException('Unexpected end of file.')
+		for line in self.__file:
 
 			# Determine the line ending of the file
 			if self.__line_ending == None:
@@ -157,16 +153,13 @@ class SRecFile:
 		# Merge all consecutive segments.
 		cur = segments[0]
 		merged = list()
-		for i in range(1, len(segments)):
-			tmp = segments[i]
-			if tmp[0] == (cur[0] + len(cur[1])):
-				cur = [cur[0],  cur[1] + tmp[1]]
+		for i in segments[1:]:
+			if i[0] == (cur[0] + len(cur[1])):
+				cur = [cur[0],  cur[1] + i[1]]
 			else:
 				merged.append(cur)
-				cur = tmp
+				cur = i
 		merged.append(cur)
-
-		# Let's use a sorted list instead...
 		self.__segments = merged
 
 	def __convert(self):
