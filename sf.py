@@ -57,7 +57,7 @@ class M16CFlash:
 				dest='address',
 				action='append',
 				type='string',
-				help='The address of the operation (except id-validate). Format: addr[:range], if addr or range is on the form 0xXXX hex is assumed, otherwise base 10. May be specified more than once accumulative.'
+				help='The address of the operation (except id-validate). Format: addr[:size], if addr or sizeis on the form 0xXXXXX hex is assumed, otherwise base 10. May be specified more than once accumulative.'
 				)
 		parser.add_option(
 				'-i', '--input-file',
