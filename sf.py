@@ -36,7 +36,7 @@ class M16CFlash:
 				dest='device_id',
 				type='string',
 				help='The device id used for mutable operations. ' +
-				'Example: ae:23:3a:dd:ea:32'
+				'Example: ae:23:3a:dd:ea:32:3f'
 				)
 		parser.add_option(
 				'--device-id-addr',
@@ -140,7 +140,7 @@ class M16CFlash:
 					)
 
 		if options.device == None:
-			raise Exception('You must specify the device to use.')
+			raise Exception('No device specified.')
 			
 
 		if options.action == None:
@@ -319,19 +319,11 @@ def parse():
 
 if __name__ == "__main__":
 
-	#import hotshot
-	#prof = hotshot.Profile('hotshot_stats')
-	#prof.runcall(parse)
-	#prof.close()
+	if str(sys.version).split()[0].split('.') < ['2', '5', '0']:
+		sys.exit('This program requires python >= 2.5 to work properly.')
 
-	#from hotshot import stats
-	#s = stats.load('hotshot_stats')
-	#s.sort_stats('time').print_stats()
-
-	#sys.exit()
-
-	#try:
-	flash = M16CFlash()
-	flash.run()
-	#except Exception, (error):
-	#	sys.exit(error)
+	try:
+		flash = M16CFlash()
+		flash.run()
+	except Exception, (error):
+		sys.exit(error)
