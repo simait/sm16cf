@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-from app import M16CFlash
+from m16c import M16CFlashApp
 
 if __name__ == "__main__":
 
@@ -9,7 +9,7 @@ if __name__ == "__main__":
 		print('Warning: This program requires python >= 2.4 to work properly.')
 
 	try:
-		flash = M16CFlash()
+		flash = M16CFlashApp()
 		flash.run()
 	except Exception, (error):
 		sys.exit(error)

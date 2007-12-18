@@ -3,7 +3,7 @@
 import serial, m16c, struct, sys, srec
 from optparse import OptionParser, SUPPRESS_HELP
 
-class M16CFlash:
+class M16CFlashApp:
 	"""Serial flasher for M16, application class."""
 
 	def __init__(self):
