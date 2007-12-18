@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import serial, m16c, struct, sys, srec
-from optparse import OptionParser
+from optparse import OptionParser, SUPPRESS_HELP
 
 class M16CFlash:
 	"""Serial flasher for M16, application class."""
@@ -22,42 +22,46 @@ class M16CFlash:
 				dest='baud',
 				type='int',
 				default=9600,
-				help='The baud rate.'
+				help='The baud rate (default: 9600).'
 				)
 		parser.add_option(
 				'-t', '--timeout',
 				dest='timeout',
 				type='int',
 				default=5,
-				help='Timeout in seconds for serial communication.'
+				help='Timeout in seconds for serial communication (default: 5).'
 				)
 		parser.add_option(
 				'--device-id',
 				dest='device_id',
 				type='string',
-				help='The device id used for mutable operations. ' +
-				'Example: ae:23:3a:dd:ea:32:3f'
+				default='0:0:0:0:0:0:0',
+				help='The device id used to validate the device. ' +
+				'Example: ae:23:3a:dd:ea:32:3f (default: 0:0:0:0:0:0:0).'
 				)
 		parser.add_option(
 				'--device-id-addr',
 				dest='device_id_addr',
 				type='int',
 				default=0x0fffdf,
-				help='The address of the device id. Example: 0x0fffdf'
+				help=SUPPRESS_HELP
+				#help='The address of the device id. Example: 0x0fffdf'
 				)
 		parser.add_option(
 				'-n', '--no-clock-validation',
 				dest='clock_validation',
 				action='store_false',
-				help='Disable clock validation when connecting.',
-				default=True
+				default=True,
+				help=SUPPRESS_HELP
+				#help='Disable clock validation when connecting.'
 				)
 		parser.add_option(
 				'-a', '--address',
 				dest='address',
 				action='append',
 				type='string',
-				help='The address of the operation (except id-validate). Format: addr[:size], if addr or sizeis on the form 0xXXXXX hex is assumed, otherwise base 10. May be specified more than once accumulative.'
+				help=SUPPRESS_HELP
+				#help='The address of the operation (except id-validate). Format: addr[:size], if addr or sizeis on the form 0xXXXXX hex is assumed, otherwise base 10. May be specified more than once accumulative.'
 				)
 		parser.add_option(
 				'-i', '--input-file',
@@ -69,66 +73,84 @@ class M16CFlash:
 				'-o', '--output-file',
 				dest='output_file',
 				type='string',
-				help='The output file for the operation.'
+				help=SUPPRESS_HELP
+				#help='The output file for the operation.'
+				)
+		parser.add_option(
+				'-u', '--unsafe',
+				dest='safe',
+				action='store_false',
+				default=True,
+				help='Enable unsafe assumptions (do not use unless you know what you are doing!!!).'
 				)
 		
-		# Actions goes here.
-		parser.add_option(
-				'--status-read',
-				dest='action',
-				action='append_const',
-				const=self.__status_read,
-				help='Read the status register of the device.'
-				)
-		parser.add_option(
-				'--status-clear',
-				dest='action',
-				action='append_const',
-				const=self.__status_clear,
-				help='Clear the status register of the device.'
-				)
-		parser.add_option(
-				'--version-read',
-				dest='action',
-				action='append_const',
-				const=self.__version_read,
-				help='Read the firmware version of the device.'
-				)
-		parser.add_option(
-				'--flash-read',
-				dest='action',
-				action='append_const',
-				const=self.__flash_read,
-				help='Read the specified address(es) range(s) from the device.'
-				)
-		parser.add_option(
-				'--flash-write',
-				dest='action',
-				action='append_const',
-				const=self.__flash_write,
-				help='Write the input file to the device flash.'
-				)
-		parser.add_option(
-				'--flash-erase',
-				dest='action',
-				action='append_const',
-				const=self.__flash_erase,
-				help='Erase the block at address(es), range ignored.'
-				)
-		parser.add_option(
-				'--flash-erase-all',
-				dest='action',
-				action='append_const',
-				const=self.__flash_erase_all,
-				help='Erase all unlocked blocks.'
-				)
-		parser.add_option(
-				'--id-validate',
-				dest='action',
-				action='append_const',
-				const=self.__id_validate,
-				help='Perform id check on the device.'
-				)
+		self.__action = None
+		self.__action_map = [
+			(
+			 '--flash-program',
+			 'Program the flash with the given file.',
+			 self.__flash_program
+			),
+			(
+			 '--status-read',
+			 SUPPRESS_HELP,
+			 #'Read the status register of the device.',
+			 self.__status_read
+			),
+			(
+			 '--status-clear',
+			 SUPPRESS_HELP,
+			 #'Clear the status register of the device.',
+			 self.__status_clear
+			),
+			(
+			 '--version-read',
+			 SUPPRESS_HELP,
+			 #'Read the version of the device.',
+			 self.__version_read
+			),
+			(
+			 '--flash-read',
+			 SUPPRESS_HELP,
+			 #'Read the specified address(es) range(s) from the device.',
+			 self.__flash_read
+			),
+			(
+			 '--flash-write',
+			 SUPPRESS_HELP,
+			 #'Write the give input file to the device flash.',
+			 self.__flash_write
+			),
+			(
+			 '--flash-erase',
+			 SUPPRESS_HELP,
+			 #'Erase the block(s) at the address(es) (broken).',
+			 self.__flash_erase
+			),
+			(
+			 '--flash-erase-all',
+			 SUPPRESS_HELP,
+			 #'Erase all blocks (that are unlocked).',
+			 self.__flash_erase_all
+			),
+			(
+			 '--id-validate',
+			 SUPPRESS_HELP,
+			 #'Perform an id validation, required for most actions.',
+			 self.__id_validate
+			)
+			]
+
+		# Add each of the actions from the action map.
+		for i in self.__action_map:
+			parser.add_option(
+					i[0],
+					help=i[1],
+					action='callback',
+					callback=self.__append_action,
+					callback_args=(i[2],)
+					)
+
 
 		(options, args) = parser.parse_args()
 		
@@ -139,13 +161,28 @@ class M16CFlash:
 					' \'%s\'' * len(args) % (tuple(args))
 					)
 
+		# Check the device.
 		if options.device == None:
 			raise Exception('No device specified.')
+
+		# Grab device id
+		self.__device_id_addr = options.device_id_addr
+		try:
+			# Create a list of int instead
+			self.__device_id = options.device_id.split(':')
+			fields = len(self.__device_id)
+
+			# Make sure no number are too large or too small
+			self.__device_id = filter(
+					lambda x: (x >= 0) and (x <= 255),
+					map(lambda x: int(x, 16), self.__device_id)
+					)
+			if fields != len(self.__device_id):
+				raise Exception('Device id field(s) out of range.')
+
+		except TypeError:
+			raise Exception('Device id contains invalid field(s).')
 			
-
-		if options.action == None:
-			raise Exception('No action specified')
-
 		# Grad any input/output files.
 		self.__input_file = options.input_file
 		self.__output_file = options.output_file
@@ -180,26 +217,8 @@ class M16CFlash:
 
 			self.__address = tmp
 
-		# Grab device id
-		self.__device_id = options.device_id
-		if self.__device_id != None:
-			try:
-				# Create a list of int instead
-				self.__device_id = self.__device_id.strip().split(':')
-				fields = len(self.__device_id)
-
-				# Make sure no number are too large or too small
-				self.__device_id = filter(
-						lambda x: (x >= 0) and (x <= 255),
-						map(lambda x: int(x, 16), self.__device_id)
-						)
-				if fields != len(self.__device_id):
-					raise Exception('Device id field(s) out of range.')
-
-			except TypeError:
-				raise Exception('Device id contains invalid field(s).')
-
-		self.__device_id_addr = options.device_id_addr
+		# Propagate any unsafe behvaiour.
+		self.__safe = options.safe
 
 		# Create a serial device
 		device = serial.Serial(
@@ -213,34 +232,85 @@ class M16CFlash:
 				not options.clock_validation
 				)
 		if not self.__flasher.clock_validated():
-			self.__flasher.clock_validate()
-			self.__flasher.baud_set(options.baud)
+			try:
+				self.__flasher.clock_validate()
+				self.__flasher.baud_set(options.baud)
+			except m16c.FlasherException, (error):
+				if self.__safe:
+					raise
+				else:
+					print('Warning: Clock validation failed, assuming M16C.')
+					self.__flasher.baud_set_force(options.baud)
+					self.__flasher.status_clear()
 		else:
 			device.setBaudrate(options.baud)
 
-		# Last but not least grab what we are supposed to do.
-		self.__action = options.action
+		# Make sure an action was specified.
+		if self.__action == None:
+			raise Exception('No action was given, nothing is performed.')
+
+
+	def __append_action(self, option, opt, value, parser, action):
+		"""For internal use ONLY!"""
+
+		if self.__action == None:
+			self.__action = list()
+		self.__action.append(action)
+
+	def __device_id_set(self, option, opt, value, parser):
+		"""For internal use ONLY!"""
+
 
 	def __unimplemented(self):
+		"""For internal use ONLY!"""
+
 		raise Exception('Action is not implemented.')
 
+	def __flash_program(self):
+		"""For internal use ONLY!"""
+		
+		# Let's do this here as well, might be redundant but at least we don't
+		# erase the flash each time we fail to give an input file.
+		if self.__input_file == None:
+			raise Exception('No input file was given.')
+
+		# Validate.
+		if not self.__flasher.id_validated():
+			self.__flasher.id_validate(self.__device_id)
+
+		# Erase the entire flash.
+		self.__flash_erase_all()
+
+		# And program the file.
+		self.__flash_write()
+
 	def __status_read(self):
+		"""For internal use ONLY!"""
+
 		status = self.__flasher.status_read()
 		print('Status register: 0x%04x' % status)
 
 	def __status_clear(self):
+		"""For internal use ONLY!"""
+
 		status = self.__flasher.status_clear()
 
 	def __version_read(self):
+		"""For internal use ONLY!"""
+
 		print('Firmware version: %s' % self.__flasher.version_read())
 
 	def __id_validate(self):
+		"""For internal use ONLY!"""
+
 		if self.__device_id == None:
 			raise Exception('Device id not specified.')
 
 		self.__flasher.id_validate(self.__device_id, self.__device_id_addr)
 
 	def __flash_read(self):
+		"""For internal use ONLY!"""
+
 		if self.__address == None:
 			raise Exception('No address specified.')
 		
@@ -276,6 +346,8 @@ class M16CFlash:
 
 
 	def __flash_write(self):
+		"""For internal use ONLY!"""
+
 		if self.__input_file == None:
 			raise Exception('No input file was given.')
 
@@ -289,6 +361,8 @@ class M16CFlash:
 
 	
 	def __flash_erase(self):
+		"""For internal use ONLY!"""
+
 		if self.__address == None:
 			raise Exception('No address specified.')
 		
@@ -301,11 +375,14 @@ class M16CFlash:
 			self.__flasher.block_erase(i[0])
 
 	def __flash_erase_all(self):
+		"""For internal use ONLY!"""
 		
 		# Erase all unlocked blocks.
 		self.__flasher.block_erase_all()
 
 	def __ram_program(self):
+		"""For internal use ONLY!"""
+		
 		if self.__input_file == None:
 			raise Exception('No input file was given.')
 
@@ -314,16 +391,4 @@ class M16CFlash:
 		for i in self.__action:
 			i()
 
-def parse():
-	srec.SRecFile(open(sys.argv[1]))
 
-if __name__ == "__main__":
-
-	if str(sys.version).split()[0].split('.') < ['2', '5', '0']:
-		sys.exit('This program requires python >= 2.5 to work properly.')
-
-	try:
-		flash = M16CFlash()
-		flash.run()
-	except Exception, (error):
-		sys.exit(error)

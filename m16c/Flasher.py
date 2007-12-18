@@ -105,6 +105,20 @@ class Flasher:
 
 		return self.__clock_validated
 
+	def baud_set_force(self, baud):
+
+		# Force clock validation and baud-rate.
+
+		self.__clock_validated = True
+
+		if self.__device.getBaudrate() == baud:
+			return
+
+		if not baud in [9600, 19200, 38400, 57600]:
+			raise FlasherException('Invalid baud rate.')
+
+		self.__device.setBaudrate(baud)
+
 	def baud_set(self, baud):
 		
 		self.__sanity(id_validation=False, clock_validation=True)

@@ -1,5 +1,3 @@
 * Implement CRC-CCITT, needed for the read_check functionality of the firmware.
-* Implement the binary file module.
 * Fix the bugs, but first find them :/
-* Non-fatal error switch for clock validation program...
-* Implement some default options, and a config file or enviuronment variables.
+* Config file support and/or environment variables.
