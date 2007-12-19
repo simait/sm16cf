@@ -28,6 +28,6 @@ setup(
 	description='A simple serial line flasher for M16C.',
 	author='Simon Aittamaa',
 	author_email='simait-2@student.ltu.se',
-	scripts=['sf'],
+	scripts=['sm16cf'],
 	packages=['m16c', 'srec']
 	)
