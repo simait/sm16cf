@@ -108,7 +108,7 @@ class Flasher:
 		self.__device.write(cmd_clock)
 		if self.__device.read() != cmd_clock:
 			raise FlasherException(
-					'Could not connect: Clock valiadation failed.'
+					'Could not connect: Clock validation failed.'
 					)
 
 		for i in range(16):
@@ -117,7 +117,7 @@ class Flasher:
 
 		if self.__device.read() != cmd_clock:
 			raise FlasherException(
-					'Could not connect: Clock valiadation failed.'
+					'Could not connect: Clock validation failed.'
 					)
 
 		self.__clock_validated = True
