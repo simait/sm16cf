@@ -248,6 +248,10 @@ class M16CFlashApp:
 				timeout=options.timeout
 				)
 
+		# Make sure we managed to open the device succesfully
+		if not device.isOpen():
+			raise Exception('Unable to open the serial device.')
+
 		# Create the flasher
 		self.__flasher = m16c.Flasher(
 				device,
