@@ -205,7 +205,7 @@ class M16CFlashApp:
 		except TypeError:
 			raise Exception('Device id contains invalid field(s).')
 			
-		# Grad any input/output files.
+		# Grab any input/output files.
 		self.__input_file = options.input_file
 		self.__output_file = options.output_file
 

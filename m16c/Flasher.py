@@ -32,10 +32,11 @@ class Flasher:
 	def __init__(self, device, clock_validated=False):
 		self.__device = device
 		self.__clock_validated = clock_validated
-		self.__STATUS_WRITE_FAILED = 0
-		self.__STATUS_PAGE_LOCKED = 1
-		self.__STATUS_INVALID_BLOCK = 2
-		self.__STATUS_INVALID_CMD = 3
+		self.__STATUS_OK            = 'Ok'
+		self.__STATUS_WRITE_FAILED  = 'Write failed'
+		self.__STATUS_PAGE_LOCKED   = 'Page locked'
+		self.__STATUS_INVALID_BLOCK = 'Invalid block'
+		self.__STATUS_INVALID_CMD   = 'Invalid command'
 
 
 	def __sanity(self, id_validation=True, clock_validation=True):
@@ -79,7 +80,7 @@ class Flasher:
 			else:
 				break
 
-	def __status_flash_check(self, status):
+	def __status_flash_error(self, status):
 		"""For internal use ONLY!"""
 
 		if (status & 0x38) == 0:
@@ -303,7 +304,7 @@ class Flasher:
 		status = self.status_read()
 		if not self.__status_flash_ok(status):
 			raise FlasherException(
-					'Reading page 0x%06x failed (%d).' % (addr & 0xffff00, self.__status_flash_check(status))
+					'Reading page 0x%06x failed: \'%s\'.' % (addr & 0xffff00, self.__status_flash_error(status))
 					)
 
 		return page
@@ -329,7 +330,7 @@ class Flasher:
 		status = self.status_read()
 		if not self.__status_flash_ok(status):
 			raise FlasherException(
-					'Write to page 0x%06x failed (%d).' % (addr & 0xffff00, self.__status_flash_check(status))
+					'Write to page 0x%06x failed: \'%s\'.' % (addr & 0xffff00, self.__status_flash_error(status))
 					)
 
 	def block_erase(self, addr):
@@ -350,7 +351,7 @@ class Flasher:
 		status = self.status_read()
 		if not self.__status_flash_ok(self.status_read()):
 			raise FlasherException(
-					'Block erase failed (%d).' % self.__status_flash_check(status)
+					'Block erase failed: \'%s\'.' % self.__status_flash_error(status)
 					)
 
 	def block_erase_all(self):
@@ -369,7 +370,7 @@ class Flasher:
 		status = self.status_read()
 		if not self.__status_flash_ok(self.status_read()):
 			raise FlasherException(
-					'Erase all blocks failed(%d).' % self.__status_flash_check(status)
+					'Erase all blocks failed: \'%s\'.' % self.__status_flash_error(status)
 					)
 
 	def segment_write(self, segment):
