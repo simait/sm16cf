@@ -1,0 +1,13 @@
+Usage should be quite obvious, something like:
+
+sm16cf \
+	--device <serial device>\
+	--baud-rate 57600\
+	--input-file <input file>\
+	--flash-program
+
+HOWEVER, should you however need to do something else, perhaps just erase the
+flash, there is an advanced interface that is supressed in the help. Just take
+a look in the m16c/M16CFlashApp.py file for what this application is capable
+of. Just remember, this is _very_ much not unsupported code so if things go
+wrong you are pretty much on your own.
