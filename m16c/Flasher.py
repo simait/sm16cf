@@ -383,7 +383,7 @@ class Flasher:
 		# Make sure the segment does not go beyond the theorethical limit
 		if (segment[0] + len(segment[1])) > 0xffffff:
 			raise FlasherException(
-					'Segment size beyond end fo theorethical flash.'
+					'Segment size beyond end of theorethical flash.'
 					)
 
 		page = segment[0] & 0xffff00

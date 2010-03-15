@@ -22,7 +22,7 @@
 
 """Serial line flasher application for m16c microcontrollers."""
 
-import serial, m16c, struct, sys, srec
+import serial, m16c, struct, sys, time, srec
 from optparse import OptionParser, SUPPRESS_HELP
 
 class M16CFlashApp:
@@ -99,6 +99,18 @@ class M16CFlashApp:
 				#help='The output file for the operation.'
 				)
 		parser.add_option(
+				'--reset-pin',
+				dest='reset_pin',
+				type='string',
+				help='Which pin resets the device, RTS or DTR.'
+				)
+		parser.add_option(
+				'--reset-time',
+				dest='reset_time',
+				type='float',
+				help='How long should we hold the reset low (default: 0.1s).'
+				)
+		parser.add_option(
 				'-u', '--unsafe',
 				dest='safe',
 				action='store_false',
@@ -160,6 +172,12 @@ class M16CFlashApp:
 			 SUPPRESS_HELP,
 			 #'Perform an id validation, required for most actions.',
 			 self.__id_validate
+			),
+			(
+			 '--reset',
+			 SUPPRESS_HELP,
+			 #'Perform an a reset, if RTS or DTR is wired to the reset pin..',
+			 self.__device_reset
 			)
 			]
 
@@ -239,22 +257,22 @@ class M16CFlashApp:
 
 			self.__address = tmp
 
-		# Propagate any unsafe behvaiour.
+		# Propagate any unsafe behaviour.
 		self.__safe = options.safe
 
 		# Create a serial device
-		device = serial.Serial(
+		self.__device = serial.Serial(
 				port=options.device,
 				timeout=options.timeout
 				)
 
 		# Make sure we managed to open the device succesfully
-		if not device.isOpen():
+		if not self.__device.isOpen():
 			raise Exception('Unable to open the serial device.')
 
 		# Create the flasher
 		self.__flasher = m16c.Flasher(
-				device,
+				self.__device,
 				not options.clock_validation
 				)
 		if not self.__flasher.clock_validated():
@@ -269,7 +287,13 @@ class M16CFlashApp:
 					self.__flasher.baud_set_force(options.baud)
 					self.__flasher.status_clear()
 		else:
-			device.setBaudrate(options.baud)
+			self.__device.setBaudrate(options.baud)
+
+		# Set the reset pin, either RTS or DTR.
+		self.__reset_pin = options.reset_pin
+
+		# How long do we hold reset low?
+		self.__reset_time = options.reset_time
 
 		# Make sure an action was specified.
 		if self.__action == None:
@@ -411,6 +435,27 @@ class M16CFlashApp:
 		
 		if self.__input_file == None:
 			raise Exception('No input file was given.')
+
+	def __device_reset(self):
+		"""For internal use ONLY!"""
+
+		# We need to know how to reset the device.
+		reset = None
+		if self.__reset_pin == None:
+			raise Exception('No reset pin specified')
+		elif self.__reset_pin.lower() == 'rts':
+			reset = self.__device.setRTS
+		elif self.__reset_pin.lower() == 'dts':
+			reset = self.__device.setRTS
+
+		# Sanity...
+		if reset == None:
+			raise Exception('Unknown reset pin specified, use \'rts\' or \'dts\'.')
+
+		# Perform the reset, 100ms should be enough?
+		reset(False)
+		time.sleep(self.__reset_time)
+		reset(True)
 
 	def run(self):
 
