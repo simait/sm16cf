@@ -198,6 +198,11 @@ class Flasher:
 		cmd_status_read = struct.pack("B", 0x70)
 		self.__device.write(cmd_status_read)
 		status = self.__device.read(2)
+		if len(status) != 2:
+			# NOTE: bug (found 2010-07-20) in pyserial causing
+			# timeout time to sometimes (Linux) be interpreted as
+			# milliseconds
+			raise FlasherException('Timeout during status read.')
 		return struct.unpack("<H", status)[0]
 
 	def status_clear(self):
