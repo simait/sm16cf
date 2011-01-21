@@ -104,6 +104,13 @@ class Flasher:
 		if self.__clock_validated:
 			raise FlasherException('Clock already validated.')
 
+		# Before we try to validate the clock we will flush the
+		# read-buffer. This is just to avoid getting the "Clock
+		# validation failed error.".
+		#
+		# Detection and patch courtesy of Henrik Mäkitaavola
+		self.__device.read()
+
 		zero = struct.pack("B", 0x00)
 		cmd_clock = struct.pack("B", 0xb0)
 		self.__device.write(cmd_clock)
