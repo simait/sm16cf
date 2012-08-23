@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding=utf-8
 
 #
 #    Simple Flasher is a serial line flashing application for Renesas M16C
