@@ -27,10 +27,16 @@ from optparse import OptionParser, SUPPRESS_HELP
 
 class M16CFlashApp:
 	"""Serial flasher for M16, application class."""
-
+	
 	def __init__(self):
 
-		parser = OptionParser()
+		parser = OptionParser(version=
+"""Simple M16C Flasher (sm16cf) version 1.0.0-rc6.
+
+Copyright (C) 2011 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.""")
 
 		# Options goes here
 		parser.add_option(
