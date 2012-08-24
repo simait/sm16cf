@@ -27,7 +27,7 @@ setup(
 	version='1.0.0-pr1',
 	description='A simple serial line flasher for M16C.',
 	author='Simon Aittamaa',
-	author_email='simait-2@student.ltu.se',
+	author_email='simon.aittamaa@ltu.se',
 	scripts=['sm16cf'],
 	packages=['m16c', 'srec']
 	)
